@@ -52,11 +52,10 @@ class MBConvBlock(nn.Module):
 
         x = self.pointwise_conv(x)
         x = self.pointwise_bn(x)
-        x = self.swish(x)
 
         if x0.shape == x.shape:
             if self.sd:
                 x = self.sd(x)
             x += x0
-        
+
         return x
