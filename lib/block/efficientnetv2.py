@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from torchvision.ops import SqueezeExcitation
 
 from lib.activation.swish import MemoryEfficientSwish
 from lib.layer.conv import SamePaddingConv2d
@@ -68,3 +67,20 @@ class MBConvBlock(nn.Module):
             x += x0
 
         return x
+
+
+class FusedMBConvBlock(MBConvBlock):
+    def __init__(self, i_c, o_c, k_s, stride, bn_eps, bn_mom, expand_ratio, sd_ratio):
+        super(FusedMBConvBlock, self).__init__(i_c, o_c, k_s, stride, bn_eps, bn_mom, 1, 0, sd_ratio)
+
+        if expand_ratio != 1:
+            m_c = i_c * expand_ratio
+            self.depthwise_conv = SamePaddingConv2d(i_c, m_c, k_s, stride, bias=False)
+            self.depthwise_bn = nn.BatchNorm2d(m_c, bn_eps, bn_mom)
+            self.pointwise_conv = SamePaddingConv2d(m_c, o_c, 1, bias=False)
+            self.pointwise_bn = nn.BatchNorm2d(o_c, bn_eps, bn_mom)
+        else:
+            self.depthwise_conv = SamePaddingConv2d(i_c, o_c, k_s, stride, bias=False)
+            self.depthwise_bn = nn.BatchNorm2d(o_c, bn_eps, bn_mom)
+            self.pointwise_conv = nn.Identity()
+            self.pointwise_bn = nn.Identity()
