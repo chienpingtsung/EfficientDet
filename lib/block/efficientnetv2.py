@@ -84,3 +84,47 @@ class FusedMBConvBlock(MBConvBlock):
             self.depthwise_bn = nn.BatchNorm2d(o_c, bn_eps, bn_mom)
             self.pointwise_conv = nn.Identity()
             self.pointwise_bn = nn.Identity()
+
+
+class Stem(nn.Module):
+    def __init__(self, i_c, o_c, k_s, stride, bn_eps, bn_mom):
+        super(Stem, self).__init__()
+
+        self.swish = MemoryEfficientSwish()
+
+        self.conv = SamePaddingConv2d(i_c, o_c, k_s, stride, bias=False)
+        self.bn = nn.BatchNorm2d(o_c, bn_eps, bn_mom)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.swish(x)
+        return x
+
+
+class Head(nn.Module):
+    def __init__(self, i_c, o_c, bn_eps, bn_mom, dropout, num_classes):
+        super(Head, self).__init__()
+
+        self.swish = MemoryEfficientSwish()
+
+        self.conv = SamePaddingConv2d(i_c, o_c, 1, bias=False)
+        self.bn = nn.BatchNorm2d(o_c, bn_eps, bn_mom)
+
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        self.dropout = nn.Dropout(dropout)
+        self.fc = nn.Linear(o_c, num_classes)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.swish(x)
+
+        b, *_ = x.shape
+
+        x = self.pool(x)
+        x = x.view(b, -1)
+        x = self.dropout(x)
+        x = self.fc(x)
+
+        return x
