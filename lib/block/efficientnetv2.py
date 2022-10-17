@@ -120,10 +120,10 @@ class Head(nn.Module):
         x = self.bn(x)
         x = self.swish(x)
 
-        b, c, *_ = x.shape
+        b, *_ = x.shape
 
         x = self.pool(x)
-        x = x.view(b, c)
+        x = x.view(b, -1)
         x = self.dropout(x)
         x = self.fc(x)
 
