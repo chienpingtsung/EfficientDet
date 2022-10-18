@@ -5,6 +5,9 @@ import torch
 
 from torch import nn
 
+from lib.activation.swish import MemoryEfficientSwish
+from lib.layer.conv import SeparableConv2d
+
 
 class Anchors(nn.Module):
     def __init__(self, anchor_scale, pyramid_levels, scales, ratios):
@@ -59,3 +62,19 @@ class Anchors(nn.Module):
         self.last_anchors[device] = anchors
 
         return anchors
+
+
+class SeparableConv2dBNSwish(nn.Module):
+    def __init__(self, i_c, o_c, k_s, bn_eps, bn_mom):
+        super(SeparableConv2dBNSwish, self).__init__()
+
+        self.swish = MemoryEfficientSwish()
+
+        self.conv = SeparableConv2d(i_c, o_c, k_s, bias=False)
+        self.bn = nn.BatchNorm2d(o_c, bn_eps, bn_mom)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.swish(x)
+        return x
