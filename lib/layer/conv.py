@@ -42,3 +42,16 @@ class SamePaddingConv2d(nn.Module):
         bottom = p_h - top
 
         return self.conv(functional.pad(x, (left, right, top, bottom)))
+
+
+class SeparableConv2d(nn.Module):
+    def __init__(self, i_c, o_c, k_s, bias=True):
+        super(SeparableConv2d, self).__init__()
+
+        self.depthwise_conv = SamePaddingConv2d(i_c, i_c, k_s, groups=i_c, bias=False)
+        self.pointwise_conv = SamePaddingConv2d(i_c, o_c, 1, bias=bias)
+
+    def forward(self, x):
+        x = self.depthwise_conv(x)
+        x = self.pointwise_conv(x)
+        return x
