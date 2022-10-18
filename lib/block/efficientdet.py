@@ -78,3 +78,69 @@ class SeparableConv2dBNSwish(nn.Module):
         x = self.bn(x)
         x = self.swish(x)
         return x
+
+
+class Classifier(nn.Module):
+    def __init__(self, i_c, num_anchors, num_classes, num_layers, pyramid_levels, bn_eps, bn_mom):
+        super(Classifier, self).__init__()
+
+        self.swish = MemoryEfficientSwish()
+
+        self.num_classes = num_classes
+
+        self.conv_list = nn.ModuleList(SeparableConv2d(i_c, i_c, 3, bias=False)
+                                       for _ in range(num_layers))
+        self.bn_list = nn.ModuleList(nn.ModuleList(nn.BatchNorm2d(i_c, bn_eps, bn_mom)
+                                                   for _ in range(num_layers))
+                                     for _ in range(pyramid_levels))
+        self.head = SeparableConv2d(i_c, num_anchors * num_classes, 3, bias=True)
+
+    def forward(self, x):
+        boxes_cla = []
+        for feat, bn_list in zip(x, self.bn_list):
+            for conv, bn in zip(self.conv_list, bn_list):
+                feat = conv(feat)
+                feat = bn(feat)
+                feat = self.swish(feat)
+            feat = self.head(feat)
+
+            b, _, h, w = feat.shape
+            feat = feat.view(b, -1, self.num_classes, h, w)
+            feat = feat.permute(0, 3, 4, 1, 2)
+            feat = feat.reshape(b, -1, self.num_classes)
+            boxes_cla.append(feat)
+        boxes_cla = torch.cat(boxes_cla, 1)
+        boxes_cla = torch.sigmoid(boxes_cla)
+        return boxes_cla
+
+
+class Regressor(nn.Module):
+    def __init__(self, i_c, num_anchors, num_layers, pyramid_levels, bn_eps, bn_mom):
+        super(Regressor, self).__init__()
+
+        self.swish = MemoryEfficientSwish()
+
+        self.conv_list = nn.ModuleList(SeparableConv2d(i_c, i_c, 3, bias=False)
+                                       for _ in range(num_layers))
+        self.bn_list = nn.ModuleList(nn.ModuleList(nn.BatchNorm2d(i_c, bn_eps, bn_mom)
+                                                   for _ in range(num_layers))
+                                     for _ in range(pyramid_levels))
+        self.head = SeparableConv2d(i_c, num_anchors * 4, 3, bias=True)
+
+    def forward(self, x):
+        boxes_reg = []
+        for feat, bn_list in zip(x, self.bn_list):
+            for conv, bn in zip(self.conv_list, bn_list):
+                feat = conv(feat)
+                feat = bn(feat)
+                feat = self.swish(feat)
+            feat = self.head(feat)
+
+            b, _, h, w = feat.shape
+            feat = feat.view(b, -1, 4, h, w)
+            feat = feat.permute(0, 3, 4, 1, 2)
+            feat = feat.reshape(b, -1, 4)
+            boxes_reg.append(feat)
+        boxes_reg = torch.cat(boxes_reg, 1)
+        boxes_reg = torch.sigmoid(boxes_reg)
+        return boxes_reg
