@@ -87,15 +87,15 @@ class EfficientNetV2(nn.Module):
     def forward_backbone(self, x):
         x = self.stem(x)
 
-        scale_feature = []
+        scale_features = []
         for block in self.block:
             x0 = x
             x = block(x)
             if x0.shape[2:] != x.shape[2:]:
-                scale_feature.append(x0)
-        scale_feature.append(x)
+                scale_features.append(x0)
+        scale_features.append(x)
 
-        return scale_feature
+        return scale_features
 
     def forward(self, x):
         *_, x = self.forward_backbone(x)
