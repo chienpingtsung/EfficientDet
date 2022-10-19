@@ -6,7 +6,8 @@ import torch
 from torch import nn
 
 from lib.activation.swish import MemoryEfficientSwish
-from lib.layer.conv import SeparableConv2d
+from lib.layer.conv import SeparableConv2d, SamePaddingConv2d
+from lib.layer.pool import SamePaddingMaxPool2d
 
 
 class Anchors(nn.Module):
@@ -144,3 +145,36 @@ class Regressor(nn.Module):
         boxes_reg = torch.cat(boxes_reg, 1)
         boxes_reg = torch.sigmoid(boxes_reg)
         return boxes_reg
+
+
+class FPNStem(nn.Module):
+    def __init__(self, p_i_c, o_c, pyramid_levels, bn_eps, bn_mom):
+        super(FPNStem, self).__init__()
+
+        self.down_times = pyramid_levels - len(p_i_c)
+
+        self.p_down_channel = nn.ModuleList()
+        for i_c in p_i_c:
+            self.p_down_channel.append(nn.Sequential(SamePaddingConv2d(i_c, o_c, 1, bias=False),
+                                                     nn.BatchNorm2d(o_c, bn_eps, bn_mom)))
+
+        if 0 < self.down_times:
+            *_, i_c = p_i_c
+            self.down_channel = nn.Sequential(SamePaddingConv2d(i_c, o_c, 1, bias=False),
+                                              nn.BatchNorm2d(o_c, bn_eps, bn_mom))
+            self.down_sample = SamePaddingMaxPool2d(3, 2)
+
+    def forward(self, x):
+        scale_features = []
+
+        for feat, p_down_channel in zip(x, self.p_down_channel):
+            scale_features.append(p_down_channel(feat))
+
+        if 0 < self.down_times:
+            *_, feat = x
+            feat = self.down_channel(feat)
+            for _ in range(self.down_times):
+                feat = self.down_sample(feat)
+                scale_features.append(feat)
+
+        return scale_features
