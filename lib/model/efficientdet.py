@@ -37,7 +37,7 @@ class EfficientDet(nn.Module):
         bn_mom = args['bn_mom']
 
         self.backbone = EfficientNetV2(i_c, scale=scale)
-        del self.bachbone.head
+        del self.backbone.head
         self.fpnstem = FPNStem(scale_channels[-self.scale_feat:], fpn_channels, pyramid_levels, bn_eps, bn_mom)
         self.fpn = nn.Sequential(*[BiFPN(fpn_channels, bn_eps, bn_mom, pyramid_levels, fpn_attention)
                                    for _ in range(fpn_layers)])
@@ -49,7 +49,7 @@ class EfficientDet(nn.Module):
     def forward(self, x):
         anchors = self.anchors(x)
 
-        x = self.backbone(x)
+        x = self.backbone.forward_backbone(x)
         x = self.fpnstem(x[-self.scale_feat:])
         x = self.fpn(x)
 
