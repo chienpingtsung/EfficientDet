@@ -11,11 +11,11 @@ from lib.layer.pool import SamePaddingMaxPool2d
 
 
 class Anchors(nn.Module):
-    def __init__(self, anchor_scale, pyramid_levels, scales, ratios):
+    def __init__(self, anchor_scale, levels, scales, ratios):
         super(Anchors, self).__init__()
 
         self.anchor_scale = anchor_scale
-        self.strides = [2 ** x for x in pyramid_levels]
+        self.strides = [2 ** x for x in levels]
         self.scales = scales
         self.ratios = ratios
 
