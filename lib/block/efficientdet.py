@@ -65,11 +65,9 @@ class Anchors(nn.Module):
         return anchors
 
 
-class SeparableConv2dBNSwish(nn.Module):
+class SeparableConv2dBN(nn.Module):
     def __init__(self, i_c, o_c, k_s, bn_eps, bn_mom):
-        super(SeparableConv2dBNSwish, self).__init__()
-
-        self.swish = MemoryEfficientSwish()
+        super(SeparableConv2dBN, self).__init__()
 
         self.conv = SeparableConv2d(i_c, o_c, k_s, bias=False)
         self.bn = nn.BatchNorm2d(o_c, bn_eps, bn_mom)
@@ -77,6 +75,17 @@ class SeparableConv2dBNSwish(nn.Module):
     def forward(self, x):
         x = self.conv(x)
         x = self.bn(x)
+        return x
+
+
+class SeparableConv2dBNSwish(SeparableConv2dBN):
+    def __init__(self, *args, **kwargs):
+        super(SeparableConv2dBNSwish, self).__init__(*args, **kwargs)
+
+        self.swish = MemoryEfficientSwish()
+
+    def forward(self, x):
+        x = super(SeparableConv2dBNSwish, self).forward(x)
         x = self.swish(x)
         return x
 
@@ -178,3 +187,70 @@ class FPNStem(nn.Module):
                 scale_features.append(feat)
 
         return scale_features
+
+
+class BiFPN(nn.Module):
+    def __init__(self, c, bn_eps, bn_mom, pyramid_levels, attention, epsilon=1e-4):
+        super(BiFPN, self).__init__()
+
+        self.swish = MemoryEfficientSwish()
+
+        self.pyramid_levels = pyramid_levels
+        self.attention = attention
+        self.epsilon = epsilon
+
+        self.upsample = nn.Upsample(scale_factor=2)
+        self.downsample = SamePaddingMaxPool2d(3, 2)
+
+        self.conv_down = nn.ModuleList(SeparableConv2dBN(c, c, 3, bn_eps, bn_mom)
+                                       for _ in range(self.pyramid_levels - 1))
+        self.conv_up = nn.ModuleList(SeparableConv2dBN(c, c, 3, bn_eps, bn_mom)
+                                     for _ in range(self.pyramid_levels - 2))
+        self.conv_sp = SeparableConv2dBN(c, c, 3, bn_eps, bn_mom)
+
+        self.conv_down_w = torch.ones(self.pyramid_levels - 1, 2)
+        self.conv_up_w = torch.ones(self.pyramid_levels - 2, 3)
+        self.conv_sp_w = torch.ones(2)
+
+        if self.attention:
+            self.relu = nn.ReLU()
+
+            self.conv_down_w = nn.Parameter(self.conv_down_w)
+            self.conv_up_w = nn.Parameter(self.conv_up_w)
+            self.conv_sp_w = nn.Parameter(self.conv_sp_w)
+
+    def forward(self, x):
+        *_, last = x
+        down_features = [last]
+        for i, conv, w in zip(range(self.pyramid_levels - 2, -1, -1),
+                              self.conv_down,
+                              self.conv_down_w):
+            if self.attention:
+                w = self.relu(w)
+                w = w / (torch.sum(w) + self.epsilon)
+            w1, w2 = w
+            last = conv(self.swish(w1 * x[i] + w2 * self.upsample(last)))
+            down_features.append(last)
+
+        *_, last = down_features
+        up_features = [last]
+        for i, j, conv, w in zip(range(1, self.pyramid_levels - 1),
+                                 range(self.pyramid_levels - 2, 0, -1),
+                                 self.conv_up,
+                                 self.conv_up_w):
+            if self.attention:
+                w = self.relu(w)
+                w = w / (torch.sum(w) + self.epsilon)
+            w1, w2, w3 = w
+            last = conv(self.swish(w1 * x[i] + w2 * down_features[j] + w3 * self.downsample(last)))
+            up_features.append(last)
+
+        *_, x_last = x
+        w = self.conv_sp_w
+        if self.attention:
+            w = self.relu(w)
+            w = w / (torch.sum(w) + self.epsilon)
+        w1, w2 = w
+        up_features.append(self.conv_sp(self.swish(w1 * x_last + w2 * self.downsample(last))))
+
+        return up_features
