@@ -120,7 +120,6 @@ class Classifier(nn.Module):
             feat = feat.reshape(b, -1, self.num_classes)
             boxes_cla.append(feat)
         boxes_cla = torch.cat(boxes_cla, 1)
-        boxes_cla = torch.sigmoid(boxes_cla)
         return boxes_cla
 
 
