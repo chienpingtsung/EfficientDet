@@ -152,7 +152,6 @@ class Regressor(nn.Module):
             feat = feat.reshape(b, -1, 4)
             boxes_reg.append(feat)
         boxes_reg = torch.cat(boxes_reg, 1)
-        boxes_reg = torch.sigmoid(boxes_reg)
         return boxes_reg
 
 
