@@ -16,4 +16,4 @@ class BoxDecoder(nn.Module):
         w = torch.exp(regression[..., 2]) * anchor_w / 2
         h = torch.exp(regression[..., 3]) * anchor_h / 2
 
-        return torch.stack([cx - w, cy - h, cx + w, cy + h], dim=2)
+        return torch.stack([cx - w, cy - h, cx + w, cy + h], dim=1 if regression.shape == anchors.shape else 2)
