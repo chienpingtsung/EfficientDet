@@ -4,10 +4,12 @@ import numpy as np
 import torch
 
 from torch import nn
+from torchvision import ops
 
 from lib.activation.swish import MemoryEfficientSwish
 from lib.layer.conv import SeparableConv2d, SamePaddingConv2d
 from lib.layer.pool import SamePaddingMaxPool2d
+from lib.utility.box import BoxDecoder, BoxEncoder
 
 
 class Anchors(nn.Module):
@@ -58,8 +60,7 @@ class Anchors(nn.Module):
             anchors.append(anchors_level.reshape((-1, 4)))
         anchors = np.vstack(anchors)
 
-        anchors = torch.from_numpy(anchors).to(dtype=dtype, device=device)
-        anchors = anchors.unsqueeze(0)
+        anchors = torch.from_numpy(anchors).to(device=device, dtype=dtype)
         self.last_anchors[device] = anchors
 
         return anchors
@@ -252,3 +253,58 @@ class BiFPN(nn.Module):
         up_features.append(self.conv_sp(self.swish(w1 * x_last + w2 * self.downsample(last))))
 
         return up_features
+
+
+class Loss(nn.Module):
+    def __init__(self, alpha=0.25, gamma=2, cla_loss_w=1, beta=1 / 9, reg_loss_w=50, iou_loss_w=None):
+        super(Loss, self).__init__()
+
+        self.alpha = alpha
+        self.gamma = gamma
+        self.cla_loss_w = cla_loss_w
+
+        self.box_encoder = BoxEncoder()
+        self.smoothl1 = nn.SmoothL1Loss(reduction='mean', beta=beta)
+        self.reg_loss_w = reg_loss_w
+
+        self.box_decoder = BoxDecoder()
+        self.iou_loss_w = iou_loss_w
+
+    def forward(self, classification, regression, anchors, box_annotations, cla_annotations):
+        classification_losses = []
+        regression_losses = []
+        iou_losses = []
+        for cla, reg, box_ann, cla_ann in zip(classification, regression, box_annotations, cla_annotations):
+            target = torch.zeros_like(cla)
+            ignore = torch.zeros_like(cla).to(torch.bool)
+            num_positive = 1
+            if len(box_ann) and len(cla_ann):
+                iou = ops.box_iou(anchors, box_ann)
+                iou_max, iou_argmax = torch.max(iou, dim=1)
+
+                negative = torch.lt(iou_max, 0.4)
+                positive = torch.ge(iou_max, 0.5)
+                ignore = torch.logical_not(torch.logical_or(negative, positive))
+
+                num_positive = torch.clamp(torch.sum(positive), min=1)
+
+                box_ann, cla_ann = box_ann[iou_argmax], cla_ann[iou_argmax]
+
+                target[positive, cla_ann[positive]] = 1
+
+                box_ann = box_ann[positive]
+                pos_reg = reg[positive]
+                pos_anc = anchors[positive]
+
+                box_enco = self.box_encoder(box_ann, pos_anc)
+                regression_losses.append(self.smoothl1(pos_reg, box_enco))
+
+                if self.iou_loss_w:
+                    box_deco = self.box_decoder(pos_reg, pos_anc)
+                    iou_losses.append(ops.complete_box_iou_loss(box_deco, box_ann, 'mean'))
+            classification_loss = ops.sigmoid_focal_loss(cla, target, self.alpha, self.gamma)
+            zeros = torch.zeros_like(classification_loss)
+            classification_losses.append(torch.sum(torch.where(ignore, zeros, classification_loss)) / num_positive)
+        return (self.cla_loss_w * torch.mean(torch.stack(classification_losses)) if classification_losses else None,
+                self.reg_loss_w * torch.mean(torch.stack(regression_losses)) if regression_losses else None,
+                self.iou_loss_w * torch.mean(torch.stack(iou_losses)) if iou_losses else None)
