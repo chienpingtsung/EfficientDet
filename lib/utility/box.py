@@ -3,8 +3,6 @@ from torch import nn
 from torchvision import ops
 
 
-
-
 class BoxEncoder(nn.Module):
     def forward(self, box_ann, anchors):
         box_ann = ops.box_convert(box_ann, 'xyxy', 'cxcywh')
