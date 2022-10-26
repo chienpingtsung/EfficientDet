@@ -56,4 +56,16 @@ class CustomPad(transforms.Pad):
         *_, h, w = image.shape
         right = self.padding - w
         bottom = self.padding - h
-        return functional.pad(image, [0, 0, right, bottom], self.fill, self.padding_mode)
+        return functional.pad(image, [0, 0, right, bottom], self.fill, self.padding_mode), boxes, classes
+
+
+def collate_fn(data):
+    image = []
+    boxes = []
+    classes = []
+    for i, b, c in data:
+        image.append(i)
+        boxes.append(b)
+        classes.append(c)
+    image = torch.stack(image)
+    return image, boxes, classes
