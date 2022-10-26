@@ -1,7 +1,20 @@
 import numpy as np
 import torch
 from torchvision import transforms
+from torchvision.datasets import CocoDetection
 from torchvision.transforms import functional
+
+
+class CustomCocoDetection(CocoDetection):
+    def __init__(self, root, annFile, transforms=None):
+        super(CustomCocoDetection, self).__init__(root, annFile)
+        self.custom_transforms = transforms
+
+    def __getitem__(self, item):
+        sample = super(CustomCocoDetection, self).__getitem__(item)
+        if self.custom_transforms:
+            sample = self.custom_transforms(sample)
+        return sample
 
 
 class CustomToTensor(transforms.ToTensor):
