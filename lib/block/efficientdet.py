@@ -305,6 +305,6 @@ class Loss(nn.Module):
             classification_loss = ops.sigmoid_focal_loss(cla, target, self.alpha, self.gamma)
             zeros = torch.zeros_like(classification_loss)
             classification_losses.append(torch.sum(torch.where(ignore, zeros, classification_loss)) / num_positive)
-        return (self.cla_loss_w * torch.mean(torch.stack(classification_losses)) if classification_losses else None,
-                self.reg_loss_w * torch.mean(torch.stack(regression_losses)) if regression_losses else None,
-                self.iou_loss_w * torch.mean(torch.stack(iou_losses)) if iou_losses else None)
+        return (self.cla_loss_w * torch.mean(torch.stack(classification_losses)),
+                self.reg_loss_w * torch.mean(torch.stack(regression_losses)) if regression_losses else 0,
+                self.iou_loss_w * torch.mean(torch.stack(iou_losses)) if iou_losses else 0)
