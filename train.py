@@ -78,12 +78,13 @@ if __name__ == '__main__':
             output = net(image.to(device))
             loss = sum(criterion(*output, boxes, classes))
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
             tq.set_description(f'Training epoch {epoch}, loss {loss.item()}')
-            epoch_loss.append(loss.item())
+
+            if torch.isfinite(loss):
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                epoch_loss.append(loss.item())
         writer.add_scalar('train/loss', sum(epoch_loss), epoch)
 
         loss = val(net, valloader, criterion, device)
