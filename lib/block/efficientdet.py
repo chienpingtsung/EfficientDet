@@ -284,7 +284,7 @@ class Loss(nn.Module):
 
                 negative = torch.lt(iou_max, 0.4)
                 positive = torch.ge(iou_max, 0.5)
-                ignore = torch.logical_not(torch.logical_or(negative, positive))
+                ignore[torch.logical_not(torch.logical_or(negative, positive))] = True
 
                 num_positive = torch.clamp(torch.sum(positive), min=1)
 
