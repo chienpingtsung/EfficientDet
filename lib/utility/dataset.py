@@ -9,12 +9,17 @@ class CustomCocoDetection(CocoDetection):
     def __init__(self, root, annFile, transforms=None):
         super(CustomCocoDetection, self).__init__(root, annFile)
         self.custom_transforms = transforms
+        self.id_map = {}
+        for idx, cat in enumerate(self.coco.dataset['categories']):
+            self.id_map[cat['id']] = idx
 
     def __getitem__(self, item):
         sample = super(CustomCocoDetection, self).__getitem__(item)
         if self.custom_transforms:
             sample = self.custom_transforms(sample)
-        return sample
+        image, boxes, classes = sample
+        classes = [self.id_map[x] for x in classes]
+        return image, boxes, torch.from_numpy(np.asarray(classes))
 
 
 class CustomToTensor(transforms.ToTensor):
@@ -29,9 +34,8 @@ class CustomToTensor(transforms.ToTensor):
             boxes.append(t['bbox'])
             classes.append(t['category_id'])
         boxes = np.asarray(boxes)
-        classes = np.asarray(classes) - 1
 
-        return image, torch.from_numpy(boxes), torch.from_numpy(classes)
+        return image, torch.from_numpy(boxes), classes
 
 
 class CustomNormalize(transforms.Normalize):
