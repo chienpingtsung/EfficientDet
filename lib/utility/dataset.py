@@ -29,7 +29,7 @@ class CustomToTensor(transforms.ToTensor):
             boxes.append(t['bbox'])
             classes.append(t['category_id'])
         boxes = np.asarray(boxes)
-        classes = np.asarray(classes)
+        classes = np.asarray(classes) - 1
 
         return image, torch.from_numpy(boxes), torch.from_numpy(classes)
 
