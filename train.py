@@ -16,7 +16,7 @@ from lib.utility.config import Config
 from lib.utility.dataset import CustomCocoDetection, CustomToTensor, CustomNormalize, CustomResize, CustomPad, \
     collate_fn
 from lib.utility.device import get_device
-from test import val
+from val import val
 
 
 def parse_args():
