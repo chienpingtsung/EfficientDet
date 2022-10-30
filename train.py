@@ -71,22 +71,23 @@ if __name__ == '__main__':
     best_loss = snapshot['best_loss'] if snapshot else math.inf
     best_epoch = snapshot['best_epoch'] if snapshot else 0
     for epoch in count(snapshot['epoch'] + 1 if snapshot else 0):
-        net.train()
-        epoch_loss = []
-        tq = tqdm(trainloader)
-        for image, boxes, classes in tq:
-            output = net(image.to(device))
-            loss = criterion(*output, [b.to(device) for b in boxes], [c.to(device) for c in classes])
+        with torch.autograd.set_detect_anomaly(True):
+            net.train()
+            epoch_loss = []
+            tq = tqdm(trainloader)
+            for image, boxes, classes in tq:
+                output = net(image.to(device))
+                loss = criterion(*output, [b.to(device) for b in boxes], [c.to(device) for c in classes])
 
-            tq.set_description(f'Epoch {epoch}, loss {[l.item() if hasattr(l, "item") else l for l in loss]}')
+                tq.set_description(f'Epoch {epoch}, loss {[l.item() if hasattr(l, "item") else l for l in loss]}')
 
-            loss = sum(loss)
-            if torch.isfinite(loss):
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                epoch_loss.append(loss.item())
-        writer.add_scalar('train/loss', sum(epoch_loss), epoch)
+                loss = sum(loss)
+                if torch.isfinite(loss):
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+                    epoch_loss.append(loss.item())
+            writer.add_scalar('train/loss', sum(epoch_loss), epoch)
 
         loss = val(net, valloader, criterion, device)
         writer.add_scalar('val/loss', loss)
