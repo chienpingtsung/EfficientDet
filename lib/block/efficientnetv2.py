@@ -64,7 +64,7 @@ class MBConvBlock(nn.Module):
         if x0.shape == x.shape:
             if self.sd:
                 x = self.sd(x)
-            x += x0
+            x = x + x0
 
         return x
 
