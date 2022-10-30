@@ -56,7 +56,7 @@ class MBConvBlock(nn.Module):
             se_x = self.se_sque(se_x)
             se_x = self.swish(se_x)
             se_x = self.se_exci(se_x)
-            x *= torch.sigmoid(se_x)
+            x = x * torch.sigmoid(se_x)
 
         x = self.pointwise_conv(x)
         x = self.pointwise_bn(x)
