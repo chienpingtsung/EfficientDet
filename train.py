@@ -76,10 +76,11 @@ if __name__ == '__main__':
         tq = tqdm(trainloader)
         for image, boxes, classes in tq:
             output = net(image.to(device))
-            loss = sum(criterion(*output, boxes, classes))
+            loss = criterion(*output, boxes, classes)
 
-            tq.set_description(f'Training epoch {epoch}, loss {loss.item()}')
+            tq.set_description(f'Epoch {epoch}, loss {[l.item() if hasattr(l, "item") else l for l in loss]}')
 
+            loss = sum(loss)
             if torch.isfinite(loss):
                 optimizer.zero_grad()
                 loss.backward()
