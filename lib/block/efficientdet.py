@@ -297,11 +297,15 @@ class Loss(nn.Module):
                 pos_anc = anchors[positive]
 
                 box_enco = self.box_encoder(box_ann, pos_anc)
-                regression_losses.append(self.smoothl1(pos_reg, box_enco))
+                loss = self.smoothl1(pos_reg, box_enco)
+                if torch.isfinite(loss):
+                    regression_losses.append(loss)
 
                 if self.iou_loss_w:
                     box_deco = self.box_decoder(pos_reg, pos_anc)
-                    iou_losses.append(ops.complete_box_iou_loss(box_deco, box_ann, 'mean'))
+                    loss = ops.complete_box_iou_loss(box_deco, box_ann, 'mean')
+                    if torch.isfinite(loss):
+                        iou_losses.append(loss)
             classification_loss = ops.sigmoid_focal_loss(cla, target, self.alpha, self.gamma)
             zeros = torch.zeros_like(classification_loss)
             classification_losses.append(torch.sum(torch.where(ignore, zeros, classification_loss)) / num_positive)
