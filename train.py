@@ -103,7 +103,7 @@ if __name__ == '__main__':
             if l_iou and torch.isfinite(l_iou):
                 writer.add_scalar('train/iou_loss', loss[2], s)
 
-            loss = sum(loss)
+            loss = sum([l_cla, l_reg, l_iou])
             if torch.isfinite(loss):
                 optim.zero_grad()
                 loss.backward()
