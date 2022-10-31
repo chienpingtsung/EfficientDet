@@ -89,7 +89,7 @@ if __name__ == '__main__':
         writer.add_scalar('train/loss', sum(epoch_loss), epoch)
 
         loss = val(net, valloader, criterion, device)
-        writer.add_scalar('val/loss', loss)
+        writer.add_scalar('val/loss', loss, epoch)
 
         snapshot = {'net': net.module.state_dict() if isinstance(net, nn.DataParallel) else net.state_dict(),
                     'optim': optimizer.state_dict(),
