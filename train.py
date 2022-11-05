@@ -14,10 +14,11 @@ from tqdm import tqdm
 
 from lib.block.efficientdet import Loss
 from lib.model.efficientdet import EfficientDet
-from lib.utility import dataset
 from lib.utility.config import Config
-from lib.utility.dataset import CustomCocoDetection, collate_fn
 from lib.utility.device import get_device
+from lib.utils import transforms
+from lib.utils.data import EfficientCocoDetection
+from lib.utils.transforms import collate_fn
 from val import val
 
 logging.basicConfig(level=logging.INFO)
@@ -36,7 +37,7 @@ def getArgs():
 
 
 def getDataLoader(root, annFile, transforms, batch_size, shuffle, collate_fn, drop_last):
-    dataset = CustomCocoDetection(Path(root), Path(annFile), transforms)
+    dataset = EfficientCocoDetection(Path(root), Path(annFile), transforms)
     num_workers = min(batch_size, os.cpu_count())
     return DataLoader(dataset, batch_size, shuffle,
                       num_workers=num_workers, collate_fn=collate_fn, pin_memory=True, drop_last=drop_last)
@@ -49,10 +50,10 @@ if __name__ == '__main__':
     writer = SummaryWriter(args.log_dir)
 
     args.batch_size *= torch.cuda.device_count() if torch.cuda.is_available() else 1
-    transforms = Compose([dataset.CustomToTensor(),
-                          dataset.CustomNormalize(project.mean, project.std),
-                          dataset.CustomResize(args.size),
-                          dataset.CustomPad(args.size)])
+    transf = Compose([transforms.EfficientToTensor(),
+                      transforms.EfficientNormalize(project.mean, project.std),
+                      transforms.EfficientResize(args.size),
+                      transforms.EfficientPad(args.size)])
     train_loader = getDataLoader(project.trainset['root'], project.trainset['annFile'], transforms,
                                  batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True)
     val_loader = getDataLoader(project.valset['root'], project.valset['annFile'], transforms,
