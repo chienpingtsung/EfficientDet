@@ -18,6 +18,7 @@ class EfficientToTensor(transforms.ToTensor):
 class EfficientNormalize(transforms.Normalize):
     def forward(self, sample):
         image, boxes, cats = sample
+
         return super(EfficientNormalize, self).forward(image), boxes, cats
 
 
