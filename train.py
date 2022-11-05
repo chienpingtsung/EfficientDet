@@ -18,7 +18,7 @@ from lib.utility.config import Config
 from lib.utility.device import get_device
 from lib.utils import transforms
 from lib.utils.data import EfficientCocoDetection
-from lib.utils.transforms import collate_fn
+from lib.utils.data import collate_fn
 from val import val
 
 logging.basicConfig(level=logging.INFO)
