@@ -44,17 +44,3 @@ class EfficientPad(transforms.Pad):
         bottom = self.padding - h
 
         return functional.pad(image, [0, 0, right, bottom], self.fill, self.padding_mode), boxes, cats
-
-
-def collate_fn(data):
-    image = []
-    boxes = []
-    cats = []
-    meta = []
-    for i, b, c, m in data:
-        image.append(i)
-        boxes.append(b)
-        cats.append(c)
-        meta.append(m)
-
-    return torch.stack(image), boxes, cats, meta

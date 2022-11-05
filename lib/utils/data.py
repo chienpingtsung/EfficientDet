@@ -1,3 +1,4 @@
+import torch
 from torchvision.datasets import CocoDetection
 
 
@@ -29,3 +30,17 @@ class EfficientCocoDetection(CocoDetection):
             sample = self.sub_transforms(sample)
 
         return *sample, (image, image_id, file_name)
+
+
+def collate_fn(data):
+    image = []
+    boxes = []
+    cats = []
+    meta = []
+    for i, b, c, m in data:
+        image.append(i)
+        boxes.append(b)
+        cats.append(c)
+        meta.append(m)
+
+    return torch.stack(image), boxes, cats, meta
