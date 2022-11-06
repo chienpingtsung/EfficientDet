@@ -1,4 +1,7 @@
+import os
+
 import torch
+from torch.utils.data import DataLoader
 from torchvision.datasets import CocoDetection
 
 
@@ -44,3 +47,15 @@ def collate_fn(data):
         meta.append(m)
 
     return torch.stack(image), boxes, cats, meta
+
+
+def getDataLoader(root, annFile, transforms, batch_size, shuffle, collate_fn, drop_last):
+    kwargs = {'dataset': EfficientCocoDetection(root, annFile, transforms),
+              'batch_size': batch_size,
+              'shuffle': shuffle,
+              'num_workers': min(batch_size, os.cpu_count()),
+              'collate_fn': collate_fn,
+              'pin_memory': True,
+              'drop_last': drop_last}
+
+    return DataLoader(**kwargs)
