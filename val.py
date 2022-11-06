@@ -1,6 +1,3 @@
-import argparse
-import logging
-
 import torch
 from torchvision import ops, utils
 from torchvision.transforms import Compose, ToPILImage, PILToTensor
@@ -8,23 +5,9 @@ from tqdm import tqdm
 
 from lib.model.efficientdet import EfficientDet
 from lib.utility.box import BoxDecoder
-from lib.utility.config import Config
-from lib.utility.device import get_device
 from lib.utils import transforms
 from lib.utils.data import collate_fn, getDataLoader
-
-logger = logging.getLogger()
-
-
-def getArgs():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-b', '--batch_size', default=4, type=int)
-    parser.add_argument('-s', '--size', default=512, type=int)
-    parser.add_argument('-c', '--scout', default=10, type=int)
-    parser.add_argument('-p', '--project', default='coco2017')
-    parser.add_argument('-l', '--log_dir')
-    parser.add_argument('-w', '--weight')
-    return parser.parse_args()
+from lib.utils.utils import getArgs, getDevice
 
 
 def val(net, dataloader, criterion, device):
@@ -44,23 +27,21 @@ def val(net, dataloader, criterion, device):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
     args = getArgs()
-    project = Config(f'project/{args.project}.yaml')
-    device = get_device()
+    device = getDevice()
 
     args.batch_size = 1
     transf = Compose([transforms.EfficientToTensor(),
-                      transforms.EfficientNormalize(project.mean, project.std),
+                      transforms.EfficientNormalize(args.mean, args.std),
                       transforms.EfficientResize(args.size),
                       transforms.EfficientPad(args.size)])
-    val_loader = getDataLoader(project.valset['root'], project.valset['annFile'], transforms,
+    val_loader = getDataLoader(args.valset['root'], args.valset['annFile'], transforms,
                                batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False)
 
     snapshot = torch.load(args.weight, map_location=torch.device('cpu'))
 
-    net = EfficientDet(len(project.categories), eval(project.anchors['scales']), eval(project.anchors['ratios']),
-                       project.anchors['levels'], project.scale_feat, project.i_c, project.compound_coef, project.scale)
+    net = EfficientDet(len(args.categories), eval(args.anchors['scales']), eval(args.anchors['ratios']),
+                       args.anchors['levels'], args.scale_feat, args.i_c, args.compound_coef, args.scale)
     net.load_state_dict(snapshot['net'])
     net.to(device)
 
@@ -98,7 +79,7 @@ if __name__ == '__main__':
 
             boxes = ops.clip_boxes_to_image(boxes, [h, w])
             output = utils.draw_bounding_boxes(toTensor(orgi_image[0]), boxes,
-                                               [project.categories[c.item()] for c in categories])
+                                               [args.categories[c.item()] for c in categories])
 
             output = toPILimage(output.to(torch.float) / 255)
             output.save(f'output/{ind}.png')

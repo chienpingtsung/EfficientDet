@@ -1,5 +1,3 @@
-import argparse
-import logging
 import math
 from itertools import count
 from pathlib import Path
@@ -12,54 +10,37 @@ from tqdm import tqdm
 
 from lib.block.efficientdet import Loss
 from lib.model.efficientdet import EfficientDet
-from lib.utility.config import Config
-from lib.utility.device import get_device
 from lib.utils import transforms
 from lib.utils.data import collate_fn, getDataLoader
+from lib.utils.utils import getArgs, getDevice
 from val import val
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-def getArgs():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-b', '--batch_size', default=4, type=int)
-    parser.add_argument('-s', '--size', default=512, type=int)
-    parser.add_argument('-c', '--scout', default=10, type=int)
-    parser.add_argument('-p', '--project', default='coco2017')
-    parser.add_argument('-l', '--log_dir')
-    parser.add_argument('-w', '--weight')
-    return parser.parse_args()
-
 
 if __name__ == '__main__':
     args = getArgs()
-    project = Config(Path(f'project/{args.project}.yaml'))
-    device = get_device()
+    device = getDevice()
     writer = SummaryWriter(args.log_dir)
 
     args.batch_size *= torch.cuda.device_count() if torch.cuda.is_available() else 1
     transf = Compose([transforms.EfficientToTensor(),
-                      transforms.EfficientNormalize(project.mean, project.std),
+                      transforms.EfficientNormalize(args.mean, args.std),
                       transforms.EfficientResize(args.size),
                       transforms.EfficientPad(args.size)])
-    train_loader = getDataLoader(project.trainset['root'], project.trainset['annFile'], transforms,
+    train_loader = getDataLoader(args.trainset['root'], args.trainset['annFile'], transforms,
                                  batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True)
-    val_loader = getDataLoader(project.valset['root'], project.valset['annFile'], transforms,
+    val_loader = getDataLoader(args.valset['root'], args.valset['annFile'], transforms,
                                batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False)
 
     snapshot = torch.load(args.weight) if args.weight else None
 
-    net = EfficientDet(len(project.categories), eval(project.anchors['scales']), eval(project.anchors['ratios']),
-                       project.anchors['levels'], project.scale_feat, project.i_c, project.compound_coef, project.scale)
+    net = EfficientDet(len(args.categories), eval(args.anchors['scales']), eval(args.anchors['ratios']),
+                       args.anchors['levels'], args.scale_feat, args.i_c, args.compound_coef, args.scale)
     if snapshot:
         net.load_state_dict(snapshot['net'])
     if torch.cuda.device_count() > 1:
         net = nn.DataParallel(net)
     net.to(device)
 
-    criterion = Loss(iou_loss_w=project.iou_loss_w)
+    criterion = Loss(iou_loss_w=args.iou_loss_w)
 
     optim = torch.optim.AdamW(net.parameters())
     if snapshot:
