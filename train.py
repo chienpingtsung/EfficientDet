@@ -1,13 +1,11 @@
 import argparse
 import logging
 import math
-import os
 from itertools import count
 from pathlib import Path
 
 import torch
 from torch import nn
-from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.transforms import Compose
 from tqdm import tqdm
@@ -17,8 +15,7 @@ from lib.model.efficientdet import EfficientDet
 from lib.utility.config import Config
 from lib.utility.device import get_device
 from lib.utils import transforms
-from lib.utils.data import EfficientCocoDetection
-from lib.utils.data import collate_fn
+from lib.utils.data import collate_fn, getDataLoader
 from val import val
 
 logging.basicConfig(level=logging.INFO)
@@ -34,13 +31,6 @@ def getArgs():
     parser.add_argument('-l', '--log_dir')
     parser.add_argument('-w', '--weight')
     return parser.parse_args()
-
-
-def getDataLoader(root, annFile, transforms, batch_size, shuffle, collate_fn, drop_last):
-    dataset = EfficientCocoDetection(Path(root), Path(annFile), transforms)
-    num_workers = min(batch_size, os.cpu_count())
-    return DataLoader(dataset, batch_size, shuffle,
-                      num_workers=num_workers, collate_fn=collate_fn, pin_memory=True, drop_last=drop_last)
 
 
 if __name__ == '__main__':

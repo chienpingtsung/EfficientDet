@@ -1,10 +1,7 @@
 import argparse
 import logging
-import os
-from pathlib import Path
 
 import torch
-from torch.utils.data import DataLoader
 from torchvision import ops, utils
 from torchvision.transforms import Compose, ToPILImage, PILToTensor
 from tqdm import tqdm
@@ -14,8 +11,7 @@ from lib.utility.box import BoxDecoder
 from lib.utility.config import Config
 from lib.utility.device import get_device
 from lib.utils import transforms
-from lib.utils.data import EfficientCocoDetection
-from lib.utils.data import collate_fn
+from lib.utils.data import collate_fn, getDataLoader
 
 logger = logging.getLogger()
 
@@ -29,13 +25,6 @@ def getArgs():
     parser.add_argument('-l', '--log_dir')
     parser.add_argument('-w', '--weight')
     return parser.parse_args()
-
-
-def getDataLoader(root, annFile, transforms, batch_size, shuffle, collate_fn, drop_last):
-    dataset = EfficientCocoDetection(Path(root), Path(annFile), transforms)
-    num_workers = min(batch_size, os.cpu_count())
-    return DataLoader(dataset, batch_size, shuffle,
-                      num_workers=num_workers, collate_fn=collate_fn, pin_memory=True, drop_last=drop_last)
 
 
 def val(net, dataloader, criterion, device):
