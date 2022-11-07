@@ -4,8 +4,8 @@ from torchvision.transforms import Compose, ToPILImage, PILToTensor
 from tqdm import tqdm
 
 from lib.model.efficientdet import EfficientDet
-from lib.utility.box import BoxDecoder
 from lib.utils import transforms
+from lib.utils.box import Box
 from lib.utils.data import collate_fn, getDataLoader
 from lib.utils.utils import getArgs, getDevice
 
@@ -45,7 +45,6 @@ if __name__ == '__main__':
     net.load_state_dict(snapshot['net'])
     net.to(device)
 
-    decoder = BoxDecoder()
     toPILimage = ToPILImage()
     toTensor = PILToTensor()
 
@@ -58,7 +57,7 @@ if __name__ == '__main__':
 
             progress.set_description(f'Validating image {ind}')
 
-            boxes = decoder(reg, anc)
+            boxes = Box.decode(reg, anc)
 
             scores, categories = torch.max(cla, dim=2)
 
