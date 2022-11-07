@@ -9,7 +9,7 @@ from torchvision import ops
 from lib.activation.swish import MemoryEfficientSwish
 from lib.layer.conv import SeparableConv2d, SamePaddingConv2d
 from lib.layer.pool import SamePaddingMaxPool2d
-from lib.utility.box import BoxDecoder, BoxEncoder
+from lib.utils.box import Box
 
 
 class Anchors(nn.Module):
@@ -263,11 +263,9 @@ class Loss(nn.Module):
         self.gamma = gamma
         self.cla_loss_w = cla_loss_w
 
-        self.box_encoder = BoxEncoder()
         self.smoothl1 = nn.SmoothL1Loss(reduction='mean', beta=beta)
         self.reg_loss_w = reg_loss_w
 
-        self.box_decoder = BoxDecoder()
         self.iou_loss_w = iou_loss_w
 
     def forward(self, classification, regression, anchors, box_annotations, cla_annotations):
@@ -296,13 +294,13 @@ class Loss(nn.Module):
                 pos_reg = reg[positive]
                 pos_anc = anchors[positive]
 
-                box_enco = self.box_encoder(box_ann, pos_anc)
+                box_enco = Box.encode(pos_anc, box_ann)
                 loss = self.smoothl1(pos_reg, box_enco)
                 if torch.isfinite(loss):
                     regression_losses.append(loss)
 
                 if self.iou_loss_w:
-                    box_deco = self.box_decoder(pos_reg, pos_anc)
+                    box_deco = Box.decode(pos_anc, pos_reg)
                     loss = ops.complete_box_iou_loss(box_deco, box_ann, 'mean')
                     if torch.isfinite(loss):
                         iou_losses.append(loss)
