@@ -14,10 +14,11 @@ def getArgs():
     parser.add_argument('-b', '--batch_size', default=4, type=int)
     parser.add_argument('-s', '--scout', default=10, type=int)
     parser.add_argument('-i', '--size', default=512, type=int)
-    parser.add_argument('-c', '--score_thr', default=0.05, type=float)
     parser.add_argument('-p', '--project', default='coco2017')
     parser.add_argument('-l', '--log_dir')
     parser.add_argument('-w', '--weight')
+    parser.add_argument('--iou_threshold', default=0.5, type=float)
+    parser.add_argument('--score_thr', default=0.05, type=float)
 
     args = parser.parse_args()
 
