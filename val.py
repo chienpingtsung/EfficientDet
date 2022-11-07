@@ -1,29 +1,56 @@
 import torch
 from torchvision import ops, utils
-from torchvision.transforms import Compose, ToPILImage, PILToTensor
+from torchvision.transforms import PILToTensor, Compose
 from tqdm import tqdm
 
 from lib.model.efficientdet import EfficientDet
 from lib.utils import transforms
 from lib.utils.box import Box
-from lib.utils.data import collate_fn, getDataLoader
+from lib.utils.data import getDataLoader, collate_fn
 from lib.utils.utils import getArgs, getDevice
 
 
-def val(net, dataloader, criterion, device):
+def val(net, dataloader, device, args, criterion=None, coco=None, visualization=None):
+    piltotensor = PILToTensor()
+
     net.eval()
-    epoch_loss = []
-    progress = tqdm(dataloader)
-    for image, boxes, classes in progress:
+
+    val_losses = []
+
+    for image, boxes, cats, meta in dataloader:
         with torch.no_grad():
-            output = net(image.to(device))
-            loss = sum(criterion(*output, [b.to(device) for b in boxes], [c.to(device) for c in classes]))
+            cla, reg, anc = net(image.to(device))
 
-            progress.set_description(f'Test loss {loss.item()}')
+            if criterion:
+                loss = sum(criterion(cla, reg, anc, [b.to(device) for b in boxes], [c.to(device) for c in cats]))
+                if torch.isfinite(loss):
+                    val_losses.append(loss.item())
 
-            if torch.isfinite(loss):
-                epoch_loss.append(loss.item())
-    return sum(epoch_loss)
+            for c, r, (image, image_id, file_name) in zip(torch.sigmoid(cla), reg, meta):
+                w, h = image.size
+                scale = args.size / max(h, w)
+
+                scores, categories = torch.max(c, dim=-1)
+
+                indices = scores > args.score_thr
+
+                a = anc[indices]
+                r = r[indices]
+                boxes = Box.decode(a, r)
+                scores = scores[indices]
+                categories = categories[indices]
+
+                indices = ops.batched_nms(boxes, scores, categories, args.iou_threshold)
+
+                boxes = ops.clip_boxes_to_image(boxes[indices] / scale, [h, w])
+                scores = scores[indices]
+                categories = categories[indices]
+
+                labels = [f'{args.categories[c.item()]}@{s.item()}' for s, c in zip(scores, categories)]
+                vis = utils.draw_bounding_boxes(piltotensor(image), boxes, labels, width=3)
+                utils.save_image(vis.to(torch.float) / 255, f'output/{file_name}')
+
+    return sum(val_losses)
 
 
 if __name__ == '__main__':
@@ -35,7 +62,7 @@ if __name__ == '__main__':
                       transforms.EfficientNormalize(args.mean, args.std),
                       transforms.EfficientResize(args.size),
                       transforms.EfficientPad(args.size)])
-    val_loader = getDataLoader(args.valset['root'], args.valset['annFile'], transforms,
+    val_loader = getDataLoader(args.valset['root'], args.valset['annFile'], transf,
                                batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False)
 
     snapshot = torch.load(args.weight, map_location=torch.device('cpu'))
@@ -45,40 +72,4 @@ if __name__ == '__main__':
     net.load_state_dict(snapshot['net'])
     net.to(device)
 
-    toPILimage = ToPILImage()
-    toTensor = PILToTensor()
-
-    net.eval()
-    progress = tqdm(val_loader)
-    for ind, (image, boxes, classes, orgi_image) in enumerate(progress):
-        with torch.no_grad():
-            cla, reg, anc = net(image.to(device))
-            cla = torch.sigmoid(cla)
-
-            progress.set_description(f'Validating image {ind}')
-
-            boxes = Box.decode(reg, anc)
-
-            scores, categories = torch.max(cla, dim=2)
-
-            indices = scores > 0.2
-            scores = scores[indices]
-            print(indices, scores.shape)
-            categories = categories[indices]
-            boxes = boxes[indices]
-
-            indices = ops.batched_nms(boxes, scores, categories, 0.2)
-            boxes = boxes[indices]
-            categories = categories[indices]
-
-            print(boxes, categories)
-            w, h = orgi_image[0].size
-            scale = args.size / max(h, w)
-            boxes = boxes / scale
-
-            boxes = ops.clip_boxes_to_image(boxes, [h, w])
-            output = utils.draw_bounding_boxes(toTensor(orgi_image[0]), boxes,
-                                               [args.categories[c.item()] for c in categories])
-
-            output = toPILimage(output.to(torch.float) / 255)
-            output.save(f'output/{ind}.png')
+    val(net, tqdm(val_loader), device, args)
