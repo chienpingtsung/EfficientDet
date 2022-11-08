@@ -26,7 +26,7 @@ if __name__ == '__main__':
                      transforms.EfficientPad(args.size)])
     train_loader = getDataLoader(args.trainset['root'], args.trainset['annFile'], trans,
                                  batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True)
-    val_loader = getDataLoader(args.valset['root'], args.valset['annFile'], transforms,
+    val_loader = getDataLoader(args.valset['root'], args.valset['annFile'], trans,
                                batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False)
 
     snapshot = torch.load(args.weight) if args.weight else None
