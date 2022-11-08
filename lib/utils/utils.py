@@ -2,6 +2,9 @@ import argparse
 
 import torch
 import yaml
+from torch import nn
+
+from lib.model.efficientdet import EfficientDet
 
 
 def getDevice():
@@ -30,3 +33,16 @@ def getArgs():
                 setattr(args, k, project[k])
 
     return args
+
+
+def getNet(args, device, parallel=False, snapshot=None):
+    net = EfficientDet(len(args.categories), eval(args.anchors['scales']), eval(args.anchors['ratios']),
+                       args.anchors['levels'], args.scale_feat, args.i_c, args.compound_coef, args.scale)
+
+    if snapshot:
+        net.load_state_dict(snapshot)
+
+    if parallel:
+        net = nn.DataParallel(net)
+
+    return net.to(device)
