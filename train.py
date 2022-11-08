@@ -31,9 +31,9 @@ if __name__ == '__main__':
 
     snapshot = torch.load(args.weight) if args.weight else None
 
-    net = getNet(args, device, torch.cuda.device_count() > 1, snapshot['net'])
+    net = getNet(args, device, torch.cuda.device_count() > 1, snapshot['net'] if snapshot else None)
 
-    criterion = Loss(iou_loss_w=args.iou_loss_w)
+    criterion = Loss()
 
     optim = torch.optim.AdamW(net.parameters())
     if snapshot:
