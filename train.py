@@ -9,7 +9,6 @@ from torchvision.transforms import Compose
 from tqdm import tqdm
 
 from lib.block.efficientdet import Loss
-from lib.model.efficientdet import EfficientDet
 from lib.utils import transforms
 from lib.utils.data import collate_fn, getDataLoader
 from lib.utils.utils import getArgs, getDevice, getNet
