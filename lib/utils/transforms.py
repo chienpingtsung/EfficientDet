@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from torchvision import transforms
+from torchvision import transforms, ops
 from torchvision.transforms import functional
 
 
@@ -12,7 +12,7 @@ class EfficientToTensor(transforms.ToTensor):
         boxes = torch.from_numpy(np.asarray(boxes))
         cats = torch.from_numpy(np.asarray(cats))
 
-        return image, boxes, cats
+        return image, ops.box_convert(boxes, 'xywh', 'xyxy'), cats
 
 
 class EfficientNormalize(transforms.Normalize):
