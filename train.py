@@ -12,7 +12,7 @@ from lib.block.efficientdet import Loss
 from lib.model.efficientdet import EfficientDet
 from lib.utils import transforms
 from lib.utils.data import collate_fn, getDataLoader
-from lib.utils.utils import getArgs, getDevice
+from lib.utils.utils import getArgs, getDevice, getNet
 from val import val
 
 if __name__ == '__main__':
@@ -21,24 +21,18 @@ if __name__ == '__main__':
     writer = SummaryWriter(args.log_dir)
 
     args.batch_size *= torch.cuda.device_count() if torch.cuda.is_available() else 1
-    transf = Compose([transforms.EfficientToTensor(),
-                      transforms.EfficientNormalize(args.mean, args.std),
-                      transforms.EfficientResize(args.size),
-                      transforms.EfficientPad(args.size)])
-    train_loader = getDataLoader(args.trainset['root'], args.trainset['annFile'], transforms,
+    trans = Compose([transforms.EfficientToTensor(),
+                     transforms.EfficientNormalize(args.mean, args.std),
+                     transforms.EfficientResize(args.size),
+                     transforms.EfficientPad(args.size)])
+    train_loader = getDataLoader(args.trainset['root'], args.trainset['annFile'], trans,
                                  batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True)
     val_loader = getDataLoader(args.valset['root'], args.valset['annFile'], transforms,
                                batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False)
 
     snapshot = torch.load(args.weight) if args.weight else None
 
-    net = EfficientDet(len(args.categories), eval(args.anchors['scales']), eval(args.anchors['ratios']),
-                       args.anchors['levels'], args.scale_feat, args.i_c, args.compound_coef, args.scale)
-    if snapshot:
-        net.load_state_dict(snapshot['net'])
-    if torch.cuda.device_count() > 1:
-        net = nn.DataParallel(net)
-    net.to(device)
+    net = getNet(args, device, torch.cuda.device_count() > 1, snapshot['net'])
 
     criterion = Loss(iou_loss_w=args.iou_loss_w)
 
@@ -56,13 +50,9 @@ if __name__ == '__main__':
         losses = []
         s = 0
         progress = tqdm(train_loader)
-        for images, boxes, classes in progress:
-            images = images.to(device)
-            boxes = [b.to(device) for b in boxes]
-            classes = [c.to(device) for c in classes]
-
-            output = net(images)
-            l_cla, l_reg, l_iou = criterion(*output, boxes, classes)
+        for images, boxes, classes, _ in progress:
+            output = net(images.to(device))
+            l_cla, l_reg, l_iou = criterion(*output, [b.to(device) for b in boxes], [c.to(device) for c in classes])
 
             loss = [l.item() if hasattr(l, 'item') else l for l in [l_cla, l_reg, l_iou]]
             progress.set_description(f'Epoch {epoch}, loss {loss}')
@@ -86,7 +76,10 @@ if __name__ == '__main__':
         writer.add_scalar('train/sum_loss', losses, epoch)
         scheduler.step(losses)
 
-        loss = val(net, val_loader, criterion, device)
+        progress = tqdm(val_loader)
+        progress.set_description('Testing')
+        loss = val(net, progress, device, args, criterion,
+                   visualization=Path(writer.log_dir).joinpath(f'visualization/{epoch}'))
         writer.add_scalar('val/sum_loss', loss, epoch)
 
         snapshot = {'net': net.module.state_dict() if isinstance(net, nn.DataParallel) else net.state_dict(),
