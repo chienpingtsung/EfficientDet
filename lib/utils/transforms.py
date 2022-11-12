@@ -12,7 +12,7 @@ class EfficientToTensor(transforms.ToTensor):
         boxes = torch.from_numpy(np.asarray(boxes))
         cats = torch.from_numpy(np.asarray(cats))
 
-        return image, ops.box_convert(boxes, 'xywh', 'xyxy'), cats
+        return image, ops.box_convert(boxes, 'xywh', 'xyxy') if len(boxes) else boxes, cats
 
 
 class EfficientNormalize(transforms.Normalize):
