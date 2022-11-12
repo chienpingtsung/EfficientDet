@@ -59,7 +59,7 @@ def val(net, dataloader, device, args, criterion=None, coco=None, id_map_reverse
                     categories = categories[indices]
 
                     if coco and id_map_reverse:
-                        for b, s, c in zip(boxes, scores, categories):
+                        for b, s, c in zip(ops.box_convert(boxes, 'xyxy', 'xywh'), scores, categories):
                             results.append({'image_id': image_id,
                                             'bbox': b.tolist(),
                                             'score': s.item(),
